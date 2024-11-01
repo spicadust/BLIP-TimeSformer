@@ -1,0 +1,20 @@
+[project]
+name = "BLIP-TimeSformer"
+version = "0.1.0"
+requires-python = ">=3.9,<3.10"
+dependencies = [
+    "timm==0.4.12",
+    "transformers==4.15.0",
+    "fairscale==0.4.4",
+    "pycocoevalcap",
+    "notebook",
+    "ipykernel>=6.29.5",
+    "decord>=0.6.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = false
