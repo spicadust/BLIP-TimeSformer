@@ -301,7 +301,6 @@ class VisionTransformer(nn.Module):
 
     def forward(self, x):
         x = self.forward_features(x)
-        x = self.head(x)
         return x
 
 def _conv_filter(state_dict, patch_size=16):

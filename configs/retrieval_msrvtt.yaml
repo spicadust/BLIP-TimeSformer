@@ -7,7 +7,7 @@ pretrained:
 
 # size of vit model; base or large
 vit: base
-batch_size: 32
+batch_size: 16
 k_test: 12
 image_size: 384
 num_frm_test: 8
