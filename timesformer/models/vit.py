@@ -297,7 +297,27 @@ class VisionTransformer(nn.Module):
             x = torch.mean(x, 1) # averaging predictions for every frame
 
         x = self.norm(x)
-        return x[:, 0]
+
+        # Separate CLS token and patch embeddings
+        cls_token = x[:, 0:1, :]  # Shape: [B, 1, D]
+        patch_embeddings = x[:, 1:, :]  # Shape: [B, T*patches_per_frame, D]
+        
+        patches_per_frame = patch_embeddings.shape[1] // T
+
+        # Reshape patch embeddings to separate frames
+        patch_embeddings = patch_embeddings.view(B, T, patches_per_frame, self.embed_dim)  # [batch, frames, patches_per_frame, hidden]
+
+        # Combine batch and frames
+        patch_embeddings = patch_embeddings.reshape(-1, patches_per_frame, self.embed_dim)  # [B*T, patches_per_frame, hidden]
+        
+        # Create new CLS tokens for each frame
+        cls_tokens = cls_token.repeat(1, T, 1)  # [B, T, D]
+        cls_tokens = cls_tokens.view(-1, 1, self.embed_dim)  # [B*T, 1, D]
+        
+        # Concatenate CLS tokens with patch embeddings
+        x = torch.cat([cls_tokens, patch_embeddings], dim=1)  # [B*T, patches_per_frame+1, D]
+    
+        return x
 
     def forward(self, x):
         x = self.forward_features(x)
