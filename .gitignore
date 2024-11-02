@@ -1,3 +1,6 @@
+.DS_Store
+
 video_data
 *.pyc
-DS_Store
+annotation
+output
