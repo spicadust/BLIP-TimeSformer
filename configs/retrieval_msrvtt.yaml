@@ -1,5 +1,5 @@
-video_root: ./video_data
-ann_root: annotation/data/msrvtt_ret
+video_root: ./small_video_data
+ann_root: annotation/data/small_msrvtt_ret
 
 # set pretrained as a file path or an url
 pretrained: 
@@ -8,6 +8,6 @@ pretrained:
 # size of vit model; base or large
 vit: base
 batch_size: 32
-k_test: 128
+k_test: 12
 image_size: 384
 num_frm_test: 8
