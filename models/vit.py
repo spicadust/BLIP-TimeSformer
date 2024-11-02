@@ -19,6 +19,8 @@ from timm.models.layers import trunc_normal_, DropPath
 from timm.models.helpers import named_apply, adapt_input_conv
 
 from fairscale.nn.checkpoint.checkpoint_activations import checkpoint_wrapper
+from timesformer.models.vit import TimeSformer
+
 
 class Mlp(nn.Module):
     """ MLP as used in Vision Transformer, MLP-Mixer and related networks
@@ -281,8 +283,12 @@ def _load_weights(model: VisionTransformer, checkpoint_path: str, prefix: str = 
 def interpolate_pos_embed(pos_embed_checkpoint, visual_encoder):        
     # interpolate position embedding
     embedding_size = pos_embed_checkpoint.shape[-1]
-    num_patches = visual_encoder.patch_embed.num_patches
-    num_extra_tokens = visual_encoder.pos_embed.shape[-2] - num_patches
+    if isinstance(visual_encoder, TimeSformer):
+        num_patches = visual_encoder.num_patches
+        num_extra_tokens = visual_encoder.model.pos_embed.shape[-2] - num_patches
+    else:
+        num_patches = visual_encoder.patch_embed.num_patches
+        num_extra_tokens = visual_encoder.pos_embed.shape[-2] - num_patches
     # height (== width) for the checkpoint position embedding
     orig_size = int((pos_embed_checkpoint.shape[-2] - num_extra_tokens) ** 0.5)
     # height (== width) for the new position embedding

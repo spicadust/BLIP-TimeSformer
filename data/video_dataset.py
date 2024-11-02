@@ -33,7 +33,7 @@ def load_jsonl(filename):
     
 class VideoDataset(Dataset):
 
-    def __init__(self, video_root, ann_root, num_frm=4, frm_sampling_strategy="rand", max_img_size=384, video_fmt='.mp4'):
+    def __init__(self, video_root, ann_root, num_frm=8, frm_sampling_strategy="rand", max_img_size=384, video_fmt='.mp4'):
         '''
         image_root (string): Root directory of video
         ann_root (string): directory to store the annotation file

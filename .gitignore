@@ -5,3 +5,4 @@ video_data
 annotation
 output
 small_video_data
+*.pyth
