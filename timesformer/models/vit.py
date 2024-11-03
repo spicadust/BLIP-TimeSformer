@@ -208,9 +208,6 @@ class VisionTransformer(nn.Module):
             for i in range(self.depth)])
         self.norm = norm_layer(embed_dim)
 
-        # Classifier head
-        self.head = nn.Linear(embed_dim, num_classes) if num_classes > 0 else nn.Identity()
-
         trunc_normal_(self.pos_embed, std=.02)
         trunc_normal_(self.cls_token, std=.02)
         self.apply(self._init_weights)
@@ -238,13 +235,6 @@ class VisionTransformer(nn.Module):
     @torch.jit.ignore
     def no_weight_decay(self):
         return {'pos_embed', 'cls_token', 'time_embed'}
-
-    def get_classifier(self):
-        return self.head
-
-    def reset_classifier(self, num_classes, global_pool=''):
-        self.num_classes = num_classes
-        self.head = nn.Linear(self.embed_dim, num_classes) if num_classes > 0 else nn.Identity()
 
     def forward_features(self, x):
         B = x.shape[0]

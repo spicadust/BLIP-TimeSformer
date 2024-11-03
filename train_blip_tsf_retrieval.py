@@ -22,7 +22,7 @@ import torch.backends.cudnn as cudnn
 import torch.distributed as dist
 from torch.utils.data import DataLoader
 
-from models.blip_retrieval import blip_retrieval
+from models.blip_tsf_retrieval import blip_tsf_retrieval
 import utils
 from utils import cosine_lr_schedule
 from data import create_dataset, create_sampler, create_loader
@@ -48,7 +48,9 @@ def train(model, data_loader, optimizer, epoch, device, config):
         else:
             alpha = config['alpha']*min(1,i/len(data_loader))
 
-        loss_ita, loss_itm = model(image, caption, alpha=alpha, idx=idx)                  
+        # reshape the image into a video dimension (B, C, T, H, W) from (B, C, H, W)
+        image = image.unsqueeze(2)
+        loss_ita, loss_itm = model(image, caption, alpha=alpha, idx=idx)
         loss = loss_ita + loss_itm
         
         optimizer.zero_grad()
@@ -247,7 +249,7 @@ def main(args, config):
 
     #### Model #### 
     print("Creating model")
-    model = blip_retrieval(pretrained=config['pretrained'], image_size=config['image_size'], vit=config['vit'], 
+    model = blip_tsf_retrieval(pretrained=config['pretrained'], image_size=config['image_size'], vit=config['vit'], 
                              vit_grad_ckpt=config['vit_grad_ckpt'], vit_ckpt_layer=config['vit_ckpt_layer'], 
                              queue_size=config['queue_size'], negative_all_rank=config['negative_all_rank'])
 
@@ -333,13 +335,12 @@ if __name__ == '__main__':
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--world_size', default=1, type=int, help='number of distributed processes')    
     parser.add_argument('--dist_url', default='env://', help='url used to set up distributed training')
-    parser.add_argument('--distributed', default=True, type=bool)
+    parser.add_argument('--distributed', default=False, type=bool)
     args = parser.parse_args()
 
     yaml = yaml.YAML()
 
     config = yaml.load(open(args.config, 'r'))
-
     Path(args.output_dir).mkdir(parents=True, exist_ok=True)
         
     yaml.dump(config, open(os.path.join(args.output_dir, 'config.yaml'), 'w'))    
