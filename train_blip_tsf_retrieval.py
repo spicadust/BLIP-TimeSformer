@@ -101,6 +101,7 @@ def evaluation(model, data_loader, device, config):
     image_feats = []
     image_embeds = []
     for image, img_id in data_loader: 
+        image = image.unsqueeze(2)
         image = image.to(device) 
         image_feat = model.visual_encoder(image)   
         image_embed = model.vision_proj(image_feat[:,0,:])            
@@ -145,6 +146,7 @@ def evaluation(model, data_loader, device, config):
     for i,sims in enumerate(metric_logger.log_every(sims_matrix[start:end], 50, header)): 
         
         topk_sim, topk_idx = sims.topk(k=config['k_test'], dim=0)
+        topk_idx = topk_idx.cpu()
         encoder_output = image_feats[topk_idx].to(device)
         encoder_att = torch.ones(encoder_output.size()[:-1],dtype=torch.long).to(device)
         output = model.text_encoder(text_ids[start+i].repeat(config['k_test'],1), 
