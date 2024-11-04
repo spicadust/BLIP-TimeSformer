@@ -1,5 +1,5 @@
 video_root: ./video_data
-ann_root: annotation/data/refined_msrvtt_ret
+ann_root: annotation/data/msrvtt_test
 
 # set pretrained as a file path or an url
 pretrained: ./output/Retrieval_msrvtt_train/checkpoint_best.pth
