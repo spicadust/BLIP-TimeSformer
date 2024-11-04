@@ -1,0 +1,12 @@
+video_root: ./video_data
+ann_root: annotation/data/refined_msrvtt_ret
+
+# use this when testing using the BLIP model
+pretrained: https://storage.googleapis.com/sfr-vision-language-research/BLIP/models/model_base.pth
+
+# size of vit model; base or large
+vit: base
+batch_size: 8
+k_test: 12
+image_size: 384
+num_frm_test: 8

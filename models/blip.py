@@ -302,7 +302,6 @@ def load_checkpoint(model, url_or_filename):
         raise RuntimeError("checkpoint url or path is invalid")
 
     state_dict = checkpoint["model"]
-
     state_dict["visual_encoder.pos_embed"] = interpolate_pos_embed(
         state_dict["visual_encoder.pos_embed"], model.visual_encoder
     )
@@ -310,6 +309,38 @@ def load_checkpoint(model, url_or_filename):
         state_dict["visual_encoder_m.pos_embed"] = interpolate_pos_embed(
             state_dict["visual_encoder_m.pos_embed"], model.visual_encoder_m
         )
+
+    for key in model.state_dict().keys():
+        if key in state_dict.keys():
+            if state_dict[key].shape != model.state_dict()[key].shape:
+                del state_dict[key]
+
+    msg = model.load_state_dict(state_dict, strict=False)
+    print("load checkpoint from %s" % url_or_filename)
+    return model, msg
+
+def load_checkpoint_evaluation(model, url_or_filename):
+    if is_url(url_or_filename):
+        cached_file = download_cached_file(
+            url_or_filename, check_hash=False, progress=True
+        )
+        checkpoint = torch.load(cached_file, map_location="cpu")
+    elif os.path.isfile(url_or_filename):
+        checkpoint = torch.load(url_or_filename, map_location="cpu")
+    else:
+        raise RuntimeError("checkpoint url or path is invalid")
+
+    state_dict = checkpoint["model"]
+    # Only use this when evaluating on MSRVTT with BLIP-TimeSformer and finetuned checkpoint
+    #
+    state_dict["visual_encoder.model.pos_embed"] = interpolate_pos_embed(
+        state_dict["visual_encoder.model.pos_embed"], model.visual_encoder
+    )
+    if "visual_encoder_m.model.pos_embed" in model.state_dict().keys():
+        state_dict["visual_encoder_m.model.pos_embed"] = interpolate_pos_embed(
+            state_dict["visual_encoder_m.model.pos_embed"], model.visual_encoder_m
+        )
+
     for key in model.state_dict().keys():
         if key in state_dict.keys():
             if state_dict[key].shape != model.state_dict()[key].shape:

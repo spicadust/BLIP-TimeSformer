@@ -5,7 +5,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
-from models.blip import create_tsf, init_tokenizer, load_checkpoint
+from models.blip import create_tsf, init_tokenizer, load_checkpoint, load_checkpoint_evaluation
 
 class BLIP_TSF_Retrieval(nn.Module):
     def __init__(self,                 
@@ -67,13 +67,46 @@ class BLIP_TSF_Retrieval(nn.Module):
         self.temp = nn.Parameter(0.07*torch.ones([]))   
         
         self.negative_all_rank = negative_all_rank
+
+        # Freeze all parameters except vision_proj and vision_proj_m
+        for name, param in self.named_parameters():
+            if not (name.startswith('vision_proj.') or name.startswith('vision_proj_m.') or name.startswith('visual_encoder.') or name.startswith('visual_encoder_m.')):
+                param.requires_grad = False
+
+        # Verify trainable parameters
+        for name, param in self.named_parameters():
+            if param.requires_grad:
+                print(f"Trainable parameter: {name}")
         
         
     def forward(self, image, caption, alpha, idx):
+
+        def process_image_embeds(image_embeds, image):
+            batch_size = image.shape[0]
+            # Reshape image embeddings
+            B, S, D = image_embeds.shape  # B=batchsize*frames, S=num_tokens+cls_token, D=hidden_dimension
+            # reshape to [batchsize, frames*num_tokens+cls_token, hidden_dimension]
+            cls_token = image_embeds[:, 0:1, :]  # [batchsize*frames, 1, hidden_dimension]
+            patch_tokens = image_embeds[:, 1:, :]  # [batchsize*frames, num_tokens, hidden_dimension]
+            # reshape patch and cls tokens to [batchsize, frames*num_tokens, hidden_dimension]
+            frames_per_sample = patch_tokens.shape[0] // batch_size
+            num_tokens = patch_tokens.shape[1]
+            hidden_dim = patch_tokens.shape[2]
+            patch_tokens = patch_tokens.reshape(batch_size, frames_per_sample * num_tokens, hidden_dim)
+            cls_token = cls_token.reshape(batch_size, frames_per_sample, hidden_dim)
+            # take mean of cls tokens, becuase they are the same for all frames in each sample
+            cls_token = cls_token.mean(dim=1, keepdim=True)
+            # concatenate cls token with patch tokens
+            new_image_embeds = torch.cat([cls_token, patch_tokens], dim=1)
+            return new_image_embeds
+
+
         with torch.no_grad():
             self.temp.clamp_(0.001,0.5)
         
-        image_embeds = self.visual_encoder(image) 
+        image_embeds = self.visual_encoder(image)
+        # only used when training on video data
+        image_embeds = process_image_embeds(image_embeds, image)
         image_atts = torch.ones(image_embeds.size()[:-1],dtype=torch.long).to(image.device)        
         image_feat = F.normalize(self.vision_proj(image_embeds[:,0,:]),dim=-1)    
         
@@ -93,24 +126,27 @@ class BLIP_TSF_Retrieval(nn.Module):
         # get momentum features
         with torch.no_grad():
             self._momentum_update()
-            image_embeds_m = self.visual_encoder_m(image) 
-            image_feat_m = F.normalize(self.vision_proj_m(image_embeds_m[:,0,:]),dim=-1)  
-            image_feat_m_all = torch.cat([image_feat_m.t(),self.image_queue.clone().detach()],dim=1)                   
+            image_embeds_m = self.visual_encoder_m(image)
+
+            # only used when training on video data
+            image_embeds_m = process_image_embeds(image_embeds_m, image)
+
+            image_feat_m = F.normalize(self.vision_proj_m(image_embeds_m[:,0,:]),dim=-1)
+            image_feat_m_all = torch.cat([image_feat_m.t(),self.image_queue.clone().detach()],dim=1)
             
             text_output_m = self.text_encoder_m(text.input_ids, attention_mask = text.attention_mask,                      
-                                                return_dict = True, mode = 'text')    
-            text_feat_m = F.normalize(self.text_proj_m(text_output_m.last_hidden_state[:,0,:]),dim=-1) 
+                                                return_dict = True, mode = 'text')
+            text_feat_m = F.normalize(self.text_proj_m(text_output_m.last_hidden_state[:,0,:]),dim=-1)
             text_feat_m_all = torch.cat([text_feat_m.t(),self.text_queue.clone().detach()],dim=1)
 
             sim_i2t_m = image_feat_m @ text_feat_m_all / self.temp  
-            sim_t2i_m = text_feat_m @ image_feat_m_all / self.temp   
-
+            sim_t2i_m = text_feat_m @ image_feat_m_all / self.temp
             sim_i2t_targets = alpha * F.softmax(sim_i2t_m, dim=1) + (1 - alpha) * sim_targets
-            sim_t2i_targets = alpha * F.softmax(sim_t2i_m, dim=1) + (1 - alpha) * sim_targets        
+            sim_t2i_targets = alpha * F.softmax(sim_t2i_m, dim=1) + (1 - alpha) * sim_targets
 
         sim_i2t = image_feat @ text_feat_m_all / self.temp 
         sim_t2i = text_feat @ image_feat_m_all / self.temp 
-                             
+
         loss_i2t = -torch.sum(F.log_softmax(sim_i2t, dim=1)*sim_i2t_targets,dim=1).mean()
         loss_t2i = -torch.sum(F.log_softmax(sim_t2i, dim=1)*sim_t2i_targets,dim=1).mean() 
 
@@ -261,10 +297,13 @@ class BLIP_TSF_Retrieval(nn.Module):
         self.ptr_queue[0] = ptr  
 
 
-def blip_tsf_retrieval(pretrained='',**kwargs):
+def blip_tsf_retrieval(pretrained='', eval=False,**kwargs):
     model = BLIP_TSF_Retrieval(**kwargs)
     if pretrained:
-        model,msg = load_checkpoint(model,pretrained)
+        if eval:
+            model,msg = load_checkpoint_evaluation(model,pretrained)
+        else:
+            model,msg = load_checkpoint(model,pretrained)
         print("missing keys:")
         print(msg.missing_keys)
     return model 
